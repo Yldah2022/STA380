@@ -1,0 +1,108 @@
+---
+title: "Association rule mining"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+## Data Loading and Initial Exploration:
+library(tidyverse)
+library(igraph)
+library(arules)
+library(arulesViz)
+library(knitr)
+
+# Load the data
+groceries_df <- read.delim("groceries.txt", header = FALSE, sep = ",", na.strings = c("", NaN))
+groceries <- read.transactions("groceries.txt", format = "basket", sep = ",")
+```
+
+
+**Exploring the Dataset**:
+    - displayed the first few rows of the dataset using `kable` to understand the structure and content of the data.
+
+```{r echo = FALSE}
+kable(head(groceries_df), format = "markdown")
+```
+
+
+**Top 20 Purchased Items**:
+    - calculated the frequency of each item purchased and visualized the top 20 items with a horizontal bar chart.
+    This helped me identify the most commonly purchased items.
+
+```{r echo = FALSE}
+# Generate item frequency table
+item_freq <- itemFrequency(groceries, type = "absolute")
+
+# Convert item frequency to a data frame
+item_freq_df <- data.frame(item = names(item_freq), frequency = item_freq)
+
+# Sort by frequency in descending order and keep top N items
+top_n_items <- 20
+top_items <- head(item_freq_df[order(-item_freq_df$frequency), ], top_n_items)
+
+# Create a horizontal bar plot using ggplot2
+ggplot(top_items, aes(x = frequency, y = reorder(item, frequency))) +
+  geom_bar(stat = "identity", fill = "#1f77b4") +
+  ggtitle("Top Purchased Items in Groceries") +
+  xlab("Occurrences") +
+  ylab("Purchased Item") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(hjust = 0, size = 10))
+```
+
+# Applying the Association Rule
+
+
+## Initial Rule: 
+Initial Rule:
+- I employed the apriori function to identify association rules in the dataset. My initial criteria were:
+- Minimum support of 0.001: Meaning the items in the rule should appear in at least 0.1% of all transactions to be considered.
+- Minimum confidence of 0.1: Meaning the rule should be correct 10% of the time.
+- Minimum length of 2: I was only interested in rules that involve at least two items.
+- The first five generated rules was displayed for a quick overview.
+
+```{r include = FALSE}
+rules <- apriori(groceries,parameter=list(support=0.001,confidence=0.1,minlen=2))
+```
+
+```{r echo = FALSE}
+inspect(rules[1:5])
+```
+## visualize the distribution of rules based on their support and confidence.
+##The shading by lift provided an indication of the "interestingness" of a rule.
+```{r, echo=FALSE}
+plot(rules, method = "scatter", measure = c("support", "confidence"), shading = "lift", jitter = 0)
+```
+There were too many rules so we pruned it down to make it simplier
+
+## refine the rules to a minimum lift of 1 and a minimum confidence of 0.5. This filtered the rules to only those that are more significant and reliable.
+```{r, echo=FALSE}
+sub_rules = subset(rules, subset=lift > 1 & confidence > 0.5)
+plot(subset(rules, subset=lift > 1 & confidence > 0.5), measure = c("support", "confidence"), shading = "lift",jitter = 0)
+```
+
+## with lift>1 and confidence>0.5, there are still too many rules and needed to be pruned further
+
+
+4. **Final Analysis**:
+    - I set stricter criteria for the rules:
+        - Minimum confidence of 0.7: Indicating the rule should be correct 70% of the time.
+        - Lift greater than 7: Suggesting that the items in the rule are bought together 7 times more often than expected if they were bought independently.
+
+
+```{r, echo=FALSE}
+better_rules = subset(rules, subset=lift > 7 & confidence > 0.7)
+
+plot(better_rules, measure = c("support", "confidence"), shading = "lift", jitter = 0)
+```
+```{r, echo=FALSE}
+plot(better_rules, method='graph')
+#plot(better_rules, method='graph', engine='htmlwidget')
+```
+## The most significant rule can be summarized as: when liquor and red/blush wine are in the basket, bottled beer is also likely present with a confidence of approximately 90.5%.
+
+## Summary:
+- Through this analysis, I explored a grocery transaction dataset, visualized the most frequently purchased items, and utilized association rule mining to discern patterns.
+- By adjusting parameters like support, confidence, and lift, I honed the rules to capture the most pertinent and reliable patterns.
+- The graph I used at the end visually represents these rules, helping me quickly identify which items are frequently bought in tandem.
